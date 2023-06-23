@@ -102,10 +102,10 @@
     <ClInclude Include="..\..\Headers\PrSDKTypes.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="SDK_Exporter.h">
+    <ClInclude Include="Custom_Exporter.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="SDK_Exporter_Params.h">
+    <ClInclude Include="Custom_Exporter_Params.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Headers\SPBasic.h">
@@ -113,7 +113,7 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ResourceCompile Include="SDK_Exporter.rc">
+    <ResourceCompile Include="Custom_Exporter.rc">
       <Filter>Resource Files</Filter>
     </ResourceCompile>
   </ItemGroup>

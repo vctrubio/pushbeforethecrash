@@ -56,7 +56,7 @@
 #define SDK_FILE_CURRENT_VERSION	5			// The current file version number. When making a change
 												// to the file structure, increment this value.
 #define SDK_FILETYPE				'WAVE'		// The four character code for our filetype
-#define SDK_FILE_EXTENSION			L".wav"
+#define SDK_FILE_EXTENSION			L"wav"
 
 // Display strings for menus
 #define SDK_FILE_NAME				L"Custom Exporter"

@@ -1,62 +1,5 @@
-/*******************************************************************/
-/*                                                                 */
-/*                      ADOBE CONFIDENTIAL                         */
-/*                   _ _ _ _ _ _ _ _ _ _ _ _ _                     */
-/*                                                                 */
-/* Copyright 1992-2008 Adobe Systems Incorporated                  */
-/* All Rights Reserved.                                            */
-/*                                                                 */
-/* NOTICE:  All information contained herein is, and remains the   */
-/* property of Adobe Systems Incorporated and its suppliers, if    */
-/* any.  The intellectual and technical concepts contained         */
-/* herein are proprietary to Adobe Systems Incorporated and its    */
-/* suppliers and may be covered by U.S. and Foreign Patents,       */
-/* patents in process, and are protected by trade secret or        */
-/* copyright law.  Dissemination of this information or            */
-/* reproduction of this material is strictly forbidden unless      */
-/* prior written permission is obtained from Adobe Systems         */
-/* Incorporated.                                                   */
-/*                                                                 */
-/*******************************************************************/
-/*
-	Revision History
-		
-	Version		Change										Engineer	Date
-	=======		======										========	======
-	1.0			created										eks			10/11/1999
-	1.1			Added note on supporting multiple			bbb			6/14/2000
-				audioRate in compGetAudioIndFormat
-	1.2			Converted to C++, imposed coding guidelines	bbb			10/22/2001
-				fixed a supervision logic bug or two...
-	1.3			Updated for Adobe Premiere 6.5				bbb			5/21/2002
-	1.4			Fixed work area export						zal			1/20/2003
-	1.5			Updated for Adobe Premiere Pro 1.0			zal			2/28/2003
-	1.6			Fixed row padding problem					zal			8/11/2003
-	2.0			Added audio support for Premiere Pro,		zal			1/6/2004
-				arbitrary audio sample rates,
-				multi-channel audio, pixel aspect ratio,
-				and fields; code cleanup
-	2.5			Updated for Adobe Premiere Pro 2.0,			zal			3/10/2006
-				code cleanup
-	3.0			High-bit video support (v410)				zal			6/20/2006
-	4.0			Ported to new export API					zal			3/3/2008
-*/
-
 #include "Custom_Exporter.h"
 #include "Custom_Exporter_Params.h"
-
-
-prMALError exSDKTest (
-	exportStdParms		*stdParmsP, 
-	exExporterInfoRec	*infoRecP)
-{
-	prMALError result = malNoError;
-
-
-	return result;
-}
-
-
 
 DllExport PREMPLUGENTRY xSDKExport (
 	csSDK_int32		selector, 
@@ -65,8 +8,7 @@ DllExport PREMPLUGENTRY xSDKExport (
 	void			*param2)
 {
 	prMALError result = exportReturn_Unsupported;
-	// exSDKTest(stdParmsP, reinterpret_cast<exExporterInfoRec*>(param1)); //just for testing, but i don't know how to debug this.
-
+	
 	switch (selector)
 	{
 		case exSelStartup:
@@ -149,7 +91,7 @@ prMALError exSDKStartup (
 	infoRecP->hideInUI			= kPrFalse;
 	infoRecP->doesNotSupportAudioOnly = kPrFalse; // Sure we support audio-only
 	infoRecP->canConformToMatchParams = kPrTrue; 
-	infoRecP->canExportVideo	= kPrFalse;		// Cannot compile Video, enables the Video checkbox in File > Export > Movie //HARDCODED [false]
+	infoRecP->canExportVideo	= kPrTrue;		// Can compile Video, enables the Video checkbox in File > Export > Movie
 	infoRecP->canExportAudio	= kPrTrue;		// Can compile Audio, enables the Audio checkbox in File > Export > Movie		
 
 	// Tell Premiere which headers the exporter was compiled with
@@ -404,6 +346,64 @@ prMALError exSDKFileExtension (
 }
 
 
+prMALError RenderAndWriteAllVideo(
+	exDoExportRec	*exportInfoP,
+	float			progress,
+	float			videoProgress,
+	PrTime			*exportDuration)
+{
+	prMALError		result			= malNoError;
+	csSDK_uint32	exID			= exportInfoP->exporterPluginID;
+	ExportSettings	*mySettings		= reinterpret_cast<ExportSettings*>(exportInfoP->privateData);
+	exParamValues	ticksPerFrame,
+					width,
+					height,
+					pixelAspectRatio;
+
+	mySettings->exportParamSuite->GetParamValue (exID, 0, ADBEVideoFPS, &ticksPerFrame);
+	mySettings->sequenceRenderSuite->MakeVideoRenderer(	exID,
+														&mySettings->videoRenderID,
+														ticksPerFrame.value.timeValue);
+
+	// The following code is in progress to test the new custom pixel format support
+	mySettings->exportParamSuite->GetParamValue(exID, 0, ADBEVideoWidth, &width);
+	mySettings->exportParamSuite->GetParamValue(exID, 0, ADBEVideoHeight, &height);
+	mySettings->exportParamSuite->GetParamValue(exID, 0, ADBEVideoAspect, &pixelAspectRatio);
+	mySettings->videoSequenceParser = new VideoSequenceParser(mySettings->spBasic,
+										width.value.intValue,
+										height.value.intValue,
+										pixelAspectRatio.value.ratioValue.numerator,
+										pixelAspectRatio.value.ratioValue.denominator);
+	mySettings->videoSequenceParser->ParseSequence(exportInfoP->timelineData);
+
+	// Since the endTime can fall in between frames, make sure to not include any fractional trailing frames
+	for (	PrTime videoTime = exportInfoP->startTime;
+			videoTime <= (exportInfoP->endTime - ticksPerFrame.value.timeValue);
+			videoTime += ticksPerFrame.value.timeValue)
+	{
+		result = RenderAndWriteVideoFrame(videoTime, exportInfoP);
+
+		progress = static_cast<float>(videoTime - exportInfoP->startTime) / static_cast<float>(*exportDuration) * videoProgress;
+		result = mySettings->exportProgressSuite->UpdateProgressPercent(exID, progress);
+		if (result == suiteError_ExporterSuspended)
+		{
+			mySettings->exportProgressSuite->WaitForResume(exID);
+		}
+		else if (result == exportReturn_Abort)
+		{
+			// Pass back the actual length exported so far
+			// Since the endTime can fall in between frames, we go with the lower of the two values
+			*exportDuration = videoTime + ticksPerFrame.value.timeValue - exportInfoP->startTime < *exportDuration ?
+								videoTime + ticksPerFrame.value.timeValue - exportInfoP->startTime : *exportDuration;
+			break;
+		}
+	}
+
+	mySettings->sequenceRenderSuite->ReleaseVideoRenderer(exID, mySettings->videoRenderID);
+	return result;
+}
+
+
 // Export markers and return warning
 void HandleOptionalExportSetting(
 	exportStdParms	*stdParmsP,
@@ -457,7 +457,8 @@ void HandleOptionalExportSetting(
 	}
 }
 
-// The main export function 
+
+// The main export function
 prMALError exSDKExport(
 	exportStdParms	*stdParmsP,
 	exDoExportRec	*exportInfoP)
@@ -465,27 +466,37 @@ prMALError exSDKExport(
 	prMALError					result					= malNoError;
 	PrTime						exportDuration			= exportInfoP->endTime - exportInfoP->startTime;
 	float						progress				= 0.0,
+								videoProgress,
 								audioProgress;
 	ExportSettings				*mySettings				= reinterpret_cast<ExportSettings*>(exportInfoP->privateData);
 
 	
 	PrSDKString					projPath;
 	
-	// prMALError test = mySettings->appSettingsSuite->GetCurrentProjectPath(&projPath);
-    // HOW would I debug ^ because it is unused so im guessing there is a hint here. 
+	prMALError test = mySettings->appSettingsSuite->GetCurrentProjectPath(&projPath);
+	
+
+	
 
 	// Write the header to disk
 	mySettings->exportFileSuite->Open(exportInfoP->fileObject);
 	result = WriteSDK_FileHeader(stdParmsP, exportInfoP, exportDuration);
 
 	// For progress meter, calculate how much video and audio should contribute to total progress
-	if (exportInfoP->exportAudio)
+	if (exportInfoP->exportVideo && exportInfoP->exportAudio)
 	{
-		audioProgress = 1.0;
+		videoProgress = 0.9f;
+		audioProgress = 0.1f;
 	}
-	else if (!exportInfoP->exportAudio)
+	else if (exportInfoP->exportVideo && !exportInfoP->exportAudio)
 	{
+		videoProgress = 1.0;
 		audioProgress = 0.0;
+	}
+	else if (!exportInfoP->exportVideo && exportInfoP->exportAudio)
+	{
+		videoProgress = 0.0;
+		audioProgress = 1.0;
 	}
 
 

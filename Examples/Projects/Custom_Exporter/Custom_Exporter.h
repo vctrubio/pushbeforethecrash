@@ -27,6 +27,7 @@
 #define WARNING_TITLE	L"This is the warning title"
 #define WARNING_DESC	L"This is the warning description"
 #define INFO_TITLE		L"This is the info title"
+
 //----------------------------------------------------------
 // Prototypes
 

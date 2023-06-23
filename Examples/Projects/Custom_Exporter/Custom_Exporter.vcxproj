@@ -215,8 +215,8 @@
       <ObjectFileName Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">.\Debug/</ObjectFileName>
     </ClCompile>
     <ClCompile Include="..\..\Utils\SDK_Segment_Utils.cpp" />
-    <ClCompile Include="SDK_Exporter.cpp" />
-    <ClCompile Include="SDK_Exporter_Params.cpp" />
+    <ClCompile Include="Custom_Exporter.cpp" />
+    <ClCompile Include="Custom_Exporter_Params.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\Utils\SDK_File.h" />
@@ -243,12 +243,12 @@
     <ClInclude Include="..\..\Headers\PrSDKSequenceRenderSuite.h" />
     <ClInclude Include="..\..\Headers\PrSDKTimeSuite.h" />
     <ClInclude Include="..\..\Headers\PrSDKTypes.h" />
-    <ClInclude Include="SDK_Exporter.h" />
-    <ClInclude Include="SDK_Exporter_Params.h" />
+    <ClInclude Include="Custom_Exporter.h" />
+    <ClInclude Include="Custom_Exporter_Params.h" />
     <ClInclude Include="..\..\Headers\SPBasic.h" />
   </ItemGroup>
   <ItemGroup>
-    <ResourceCompile Include="SDK_Exporter.rc" />
+    <ResourceCompile Include="Custom_Exporter.rc" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
