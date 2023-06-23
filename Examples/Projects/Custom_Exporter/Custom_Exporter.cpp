@@ -465,9 +465,7 @@ prMALError exSDKExport(
 {
 	prMALError					result					= malNoError;
 	PrTime						exportDuration			= exportInfoP->endTime - exportInfoP->startTime;
-	float						progress				= 0.0,
-								videoProgress,
-								audioProgress;
+	float						audioProgress			= 1.0;
 	ExportSettings				*mySettings				= reinterpret_cast<ExportSettings*>(exportInfoP->privateData);
 
 	
@@ -482,30 +480,7 @@ prMALError exSDKExport(
 	mySettings->exportFileSuite->Open(exportInfoP->fileObject);
 	result = WriteSDK_FileHeader(stdParmsP, exportInfoP, exportDuration);
 
-	// For progress meter, calculate how much video and audio should contribute to total progress
-	if (exportInfoP->exportVideo && exportInfoP->exportAudio)
-	{
-		videoProgress = 0.9f;
-		audioProgress = 0.1f;
-	}
-	else if (exportInfoP->exportVideo && !exportInfoP->exportAudio)
-	{
-		videoProgress = 1.0;
-		audioProgress = 0.0;
-	}
-	else if (!exportInfoP->exportVideo && exportInfoP->exportAudio)
-	{
-		videoProgress = 0.0;
-		audioProgress = 1.0;
-	}
-
-
-	// Even if user aborted export during video rendering, we'll just finish the audio to that point since it is really fast
-	// and will make the export complete. How your exporter handles an abort, of course, is up to your implementation
-	if (exportInfoP->exportAudio)
-	{
-		RenderAndWriteAllAudio(exportInfoP, exportDuration);
-	}
+	RenderAndWriteAllAudio(exportInfoP, exportDuration);
 
 	// If export was aborted midway by user, rewrite the header to reflect the shorter file
 	if (result == exportReturn_Abort)
